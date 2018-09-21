@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import mxnet as mx
 import urllib.request
 import os, logging, sys
@@ -5,7 +7,7 @@ from typing import Optional, List
 from argparse import ArgumentParser
 from os.path import join, exists
 from numpy import genfromtxt
-from code.vae import construct_vae, ElboMetric
+from vae import construct_vae, ElboMetric
 
 # from matplotlib import pyplot as plt
 

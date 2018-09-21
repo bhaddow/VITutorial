@@ -1,7 +1,7 @@
 import mxnet as mx
 from abc import ABC
 from typing import List, Tuple, Callable, Optional
-from .kl_divergences import diagonal_gaussian_kl
+from kl_divergences import diagonal_gaussian_kl
 
 
 class Generator(ABC):
