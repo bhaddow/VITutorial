@@ -154,7 +154,7 @@ class GaussianInferenceNetwork(InferenceNetwork):
 
         return mean, std
 
-    def sample_latent_state(self, mean: mx.sym.Symbol, std: mx.sym.Symbol) -> mx.sym.Symbol:
+    def sample_latent_state(self, mean: mx.sym.Symbol, std: mx.sym.Symbol, n: Optional[int] = 1) -> mx.sym.Symbol:
         """
         Sample a latent Gaussian variable
 
@@ -163,6 +163,10 @@ class GaussianInferenceNetwork(InferenceNetwork):
         :return: A Gaussian sample
         """
         # TODO sampling needs to be adjusted once correlations are introduced
+        if n > 1:
+            # TODO: make sure this can be used during training
+            mean = mx.sym.tile(data=mean, reps=(n,1), name="inf_net_replicate_mean")
+            std = mx.sym.tile(data=std, reps=(n,1), name="inf_net_replicate_std")
         return mean + std * mx.sym.random_normal(loc=0, scale=1, shape=(0, self.latent_var_size))
 
 
@@ -246,9 +250,7 @@ class GaussianVAE(VAE):
         :return: The reconstructed data.
         """
         mean, std = self.inference_net.inference(data=data)
-        mean = mx.sym.tile(data=mean, reps=(n, 1))
-        std = mx.sym.tile(data=std, reps=(n, 1))
-        latent_state = self.sample_latent_state(mean, std, n)
+        latent_state = self.inference_net.sample_latent_state(mean, std, n)
         return self.generator.generate_sample(latent_state=latent_state)
 
     def phantasize(self, n: int) -> mx.sym.Symbol:

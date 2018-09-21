@@ -112,9 +112,50 @@ def train_model(generator_layers: List[int],
                eval_metric="Loss")
 
 
-def load_model(model_file: str):
-    # TODO
-    pass
+
+def reconstruct_from_model(
+                generator_layers: List[int],
+                inference_layers: List[int],
+                latent_size: int,
+                samples: int, 
+                ctx: mx.context = mx.cpu(),
+                logger: Optional[logging.Logger] = logging
+                ):
+  mnist = load_data(train=False) # to get the dimension
+  test_set = mnist['test']
+  random_idx = np.random.randint(test_set.shape[0])
+  random_picture = test_set[random_idx, :]
+  width = height = int(math.sqrt(test_set.shape[1]))
+  plot, canvas = plt.subplots(1, figsize=(5,5))
+  canvas.imshow(np.reshape(random_picture.asnumpy(), (width, height)), cmap = cm.Greys)
+  plt.show()
+
+  logger.info("Loading saved module: vae")
+  vae = construct_vae(latent_type="gaussian", likelihood="bernoulliProd", generator_layer_sizes=generator_layers,
+                      infer_layer_size=inference_layers, latent_variable_size=latent_size,
+                      data_dims=test_set.shape[1], generator_act_type='tanh', infer_act_type='tanh')
+  sym, arg_params, aux_params =  mx.model.load_checkpoint("vae", 20)
+  arg_params["random_digit"] = random_picture
+  reconstructions = mx.sym.Group([vae.generate_reconstructions(mx.sym.Variable("random_digit"), samples)])
+  reconstructions_exec = reconstructions.bind(ctx=ctx, args=arg_params)
+
+  logger.info("Generating {} samples".format(samples))
+  digits = reconstructions_exec.forward()
+
+  digits = digits[0].asnumpy()
+
+  #plot
+  width = height = int(math.sqrt(mnist['test'].shape[1]))
+  cols = 3
+  rows = int(samples/cols)
+  plot, axes = plt.subplots(rows, cols, sharex='col', sharey='row', figsize=(30,6))
+  sample = 0
+  for row in range(rows):
+    for col in range(cols):
+      axes[row][col].imshow(np.reshape(digits[sample,:], (width, height)), cmap=cm.Greys)
+      sample += 1
+  plt.show()
+  
 
 def sample_from_model(
                 generator_layers: List[int],
@@ -129,12 +170,8 @@ def sample_from_model(
   vae = construct_vae(latent_type="gaussian", likelihood="bernoulliProd", generator_layer_sizes=generator_layers,
                       infer_layer_size=inference_layers, latent_variable_size=latent_size,
                       data_dims=mnist['test'].shape[1], generator_act_type='tanh', infer_act_type='tanh')
-  #module = mx.module.Module(vae.train(mx.sym.Variable("data"), mx.sym.Variable('label')), ctx, data_names=("data",), 
-  #                          label_names=("label",))
   sym, arg_params, aux_params =  mx.model.load_checkpoint("vae", 20)
-  #module.set_params(arg_params, aux_params)
   logger.info("Generating {} samples".format(samples))
-  #params = module.get_params()[0]
   
 
   # We group the outputs of phantasize to be able to process them as a single symbol
@@ -178,6 +215,9 @@ def main():
     command_line_parser.add_argument('-s', '--sample-random-digits', type=int, default=0,
                                      help="Load parameters of a previously trained VAE and randomly generate "
                                           "image digits from it.")
+    command_line_parser.add_argument('-r', '--reconstruct-random-digits', type=int, default=0,
+                                     help="Load parameters of a previously trained VAE and reconstruct "
+                                          "a random digit from it.")
 
     args = command_line_parser.parse_args()
 
@@ -190,7 +230,7 @@ def main():
     inference_layers = [600, 400]
     latent_size = args.latent_dim
 
-    training = not args.sample_random_digits
+    training = not args.sample_random_digits and not args.reconstruct_random_digits
 
     logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG, stream=sys.stdout)
     logger = logging.getLogger(__name__)
@@ -198,9 +238,12 @@ def main():
     if training:
         train_model(generator_layers=generator_layers, inference_layers=inference_layers, latent_size=latent_size,
                     batch_size=batch_size, epochs=epochs, optimiser=opt, ctx=ctx)
-    else:
+    elif args.sample_random_digits:
       sample_from_model(generator_layers=generator_layers, inference_layers=inference_layers, latent_size=latent_size,
                     samples=args.sample_random_digits, ctx=ctx)
+    else:
+      reconstruct_from_model(generator_layers=generator_layers, inference_layers=inference_layers, latent_size=latent_size,
+                    samples=args.reconstruct_random_digits, ctx=ctx)
 
 
 
