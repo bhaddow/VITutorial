@@ -124,7 +124,7 @@ def reconstruct_from_model(
   mnist = load_data(train=False) # to get the dimension
   test_set = mnist['test']
   random_idx = np.random.randint(test_set.shape[0])
-  random_picture = test_set[random_idx, :]
+  random_picture = test_set[random_idx:random_idx+1, :]
   width = height = int(math.sqrt(test_set.shape[1]))
   plot, canvas = plt.subplots(1, figsize=(5,5))
   canvas.imshow(np.reshape(random_picture.asnumpy(), (width, height)), cmap = cm.Greys)
@@ -137,6 +137,8 @@ def reconstruct_from_model(
   sym, arg_params, aux_params =  mx.model.load_checkpoint("vae", 20)
   arg_params["random_digit"] = random_picture
   reconstructions = mx.sym.Group([vae.generate_reconstructions(mx.sym.Variable("random_digit"), samples)])
+  #for k,v in arg_params.items():
+  #  print (k,v.shape)
   reconstructions_exec = reconstructions.bind(ctx=ctx, args=arg_params)
 
   logger.info("Generating {} samples".format(samples))
